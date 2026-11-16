@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: api/package-lock.json
+          cache-dependency-path: foodbridge-backend/package-lock.json
       - run: npm ci
       - run: npx prisma generate
       - run: npm run lint
