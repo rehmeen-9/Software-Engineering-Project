@@ -1,0 +1,28 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My listings - FoodBridge</title><link rel="stylesheet" href="shared.css"></head><body>
+<div class="nav"><b>FoodBridge Vendor</b><a href="vendor-dashboard.html">Dashboard</a><a href="vendor-claims.html">Claims</a></div>
+<div class="w"><h1>My listings</h1><p class="m">Everything you have posted, with its status.</p>
+<div id="tabs"></div><div id="list">Loading...</div></div>
+<script src="config.js"></script>
+<script>
+var TABS=['All','Available','Claimed','Completed','Expired'],cur='';
+function tabs(){document.getElementById('tabs').innerHTML=TABS.map(function(t,i){var f=i?t.toLowerCase():'';return '<span class="chip'+(f===cur?' on':'')+'" data-f="'+f+'">'+t+'</span>'}).join('')}
+document.getElementById('tabs').onclick=function(e){if(e.target.dataset.f!==undefined){cur=e.target.dataset.f;tabs();load()}};
+async function load(){
+  var box=document.getElementById('list');
+  try{
+    var r=await fetch(API_URL+'/api/listings/mine'+(cur?'?status='+cur:''),{headers:authHeaders()});
+    var d=await r.json();
+    if(!r.ok){box.innerHTML='<p class="err">'+esc(d.message)+'</p>';return}
+    box.innerHTML=d.listings.length?d.listings.map(function(l){
+      return '<div class="box"><div class="row" style="border:0"><span><b>'+esc(l.title)+'</b><br><span class="m">'+l.quantity+' left · '+esc(fmtWindow(l.pickup_start,l.expiry_time))+'</span></span><span class="tag'+(l.status==='available'?'':' n')+'">'+esc(l.status)+'</span></div>'
+      +(l.editable?'<a class="link" href="edit-listing.html?id='+l.id+'">Edit</a><button class="link" onclick="del('+l.id+')">Remove</button>':'<span class="m">Can\u2019t be edited or removed once it is '+esc(l.status)+'.</span>')+'</div>'}).join(''):'<p class="m">No listings here.</p>';
+  }catch(e){box.innerHTML='<p class="err">Could not reach the server.</p>'}
+}
+async function del(id){
+  if(!confirm('Remove this listing?'))return;
+  var r=await fetch(API_URL+'/api/listings/'+id,{method:'DELETE',headers:authHeaders()});
+  if(r.ok)load();else alert((await r.json()).message);
+}
+tabs();load();
+</script></body></html>

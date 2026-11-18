@@ -1,0 +1,25 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listing - FoodBridge</title><link rel="stylesheet" href="shared.css"></head><body>
+<div class="nav"><b>FoodBridge</b><a href="browse.html">Browse</a><a href="my-claims.html">My claims</a></div>
+<div class="w"><p class="m"><a href="browse.html" style="color:inherit">Browse food</a> / Listing</p><div id="out">Loading...</div></div>
+<script src="config.js"></script>
+<script>
+(async function(){
+  var out=document.getElementById('out'),id=new URLSearchParams(location.search).get('id');
+  try{
+    var r=await fetch(API_URL+'/api/listings/'+encodeURIComponent(id),{headers:authHeaders()});
+    var d=await r.json();
+    if(!r.ok){out.innerHTML='<p class="err">'+esc(d.message)+'</p>';return}
+    var l=d.listing,v=l.vendor;
+    out.innerHTML='<span class="tag">'+l.quantity+' left</span> <span class="tag n">'+esc(l.food_type)+'</span> <span class="tag n">'+esc(l.status)+'</span>'
+    +'<h1 style="margin-top:8px">'+esc(l.title)+'</h1>'
+    +'<p class="m">'+esc(v.name)+' · '+(v.trust_score===null?'No ratings yet':'Trust score '+v.trust_score+' ('+v.rating_count+' ratings)')+'</p>'
+    +'<div class="box"><b>About this listing</b><p class="m">'+esc(l.description||'No description.')+'</p></div>'
+    +(v.about?'<div class="box"><b>About '+esc(v.name)+'</b><p class="m">'+esc(v.about)+'</p></div>':'')
+    +'<div class="box"><div class="row"><span>Quantity</span><b>'+l.quantity+'</b></div><div class="row"><span>Food type</span><b>'+esc(l.food_type)+'</b></div><div class="row"><span>Pickup window</span><b>'+esc(fmtWindow(l.pickup_start,l.pickup_end))+'</b></div>'
+    +'<div class="row"><span>Address</span><b>'+(l.contact_visible?esc(l.pickup_address||'Not provided'):'Shared after the vendor approves your claim')+'</b></div>'
+    +'<div class="row"><span>Phone</span><b>'+(l.contact_visible?esc(l.vendor_phone||'Not provided'):'Shared after the vendor approves your claim')+'</b></div></div>'
+    +(l.can_claim?'<a class="btn" href="claim.html?id='+l.id+'">Request to claim</a>':'<p class="m">This listing can\u2019t be claimed right now.</p>');
+  }catch(e){out.innerHTML='<p class="err">Could not reach the server.</p>'}
+})();
+</script></body></html>
