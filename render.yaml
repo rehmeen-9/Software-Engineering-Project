@@ -2,14 +2,13 @@ services:
   - type: web
     name: foodbridge-api
     runtime: node
-    rootDir: api
-    buildCommand: npm install && npm run build
-    startCommand: npm run db:deploy && npm start
-    healthCheckPath: /health
+    rootDir: foodbridge-backend
+    buildCommand: npm install
+    startCommand: node app.js
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: DIRECT_URL
+      - key: JWT_SECRET
         sync: false
       - key: CORS_ORIGIN
         sync: false
