@@ -4,8 +4,10 @@ services:
     runtime: node
     rootDir: foodbridge-backend
     buildCommand: npm install
-    startCommand: node app.js
+    startCommand: npm start
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
