@@ -1,61 +1,41 @@
 # FoodBridge
 
-Neighbour-to-neighbour food rescue. Vendors post surplus, receivers claim and collect with a pickup code, ratings build a trust score.
+Neighbour-to-neighbour food rescue. Vendors post surplus, recipients claim and collect with a pickup code, ratings build a trust score.
 
-- `frontend/` React + Vite (deployed on Vercel)
-- `foodbridge-backend/` Node + Express + pg (deployed on Render)
-- Database: Neon Postgres (schema in `schema.sql`)
+- `foodbridge-backend/` Node + Express API (deployed on Render)
+- Frontend: to be added (separate vendor and recipient views)
+- Database: set up with `schema.sql`
 
 ## Branching
 
-- `main` is protected and always deployable. Changes arrive by pull request only.
-- `develop` is the integration branch. Branch features off `develop` (`feature/<name>`) and open PRs into `develop`.
-- CI (lint and tests) must pass before merging.
+- `main` is always deployable. Changes arrive by pull request.
+- Branch features as `feature/<name>` and open a PR into `main`.
+- CI must pass before merging.
 
 ## Run locally
 
 Requires Node 20 or newer.
 
-1. Clone and enter the repo.
-2. API:
-   ```bash
-   cd foodbridge-backend
-   cp .env.example .env      # fill in the database URL and JWT secret
-   npm install
-   psql "$DATABASE_URL" -f ../schema.sql    # creates the tables
-   npm run dev               # http://localhost:5000/health
-   ```
-3. Frontend (new terminal):
-   ```bash
-   cd frontend
-   cp .env.example .env
-   npm install
-   npm run dev               # http://localhost:5173
-   ```
-4. The page should say `API status: ok`.
-
-## Checks
-
 ```bash
-cd foodbridge-backend && node -e "require('./src/app')"
-cd frontend && npm run lint && npm test && npm run build
+cd foodbridge-backend
+npm install
+# create a .env file with the variables below
+node app.js
 ```
+
+Run `schema.sql` on your database once before starting.
 
 ## Environment variables
 
-| Where | Name | Purpose |
-|---|---|---|
-| API | PORT | Server port (default 5000) |
-| API | DATABASE_URL | Neon Postgres connection string |
-| API | JWT_SECRET | Secret used to sign login tokens |
-| API | JWT_EXPIRES_IN | Token lifetime, e.g. `1d` |
-| API | NODE_ENV | Set to `production` when deployed (enables SSL for the database) |
-| Frontend | VITE_API_URL | Public URL of the API |
+| Name | Purpose |
+|---|---|
+| `DATABASE_URL` | Database connection string |
+| `JWT_SECRET` | Secret for signing login tokens |
+| `CORS_ORIGIN` | Frontend URL allowed to call the API |
 
-Never commit `.env` files. Set the same names in Render (API) and Vercel (frontend).
+Never commit `.env` files. Set the same names in Render.
 
 ## Deploy
 
-- Frontend: Vercel, root directory `frontend`, framework Vite.
-- API: Render web service, root directory `foodbridge-backend` (or use `render.yaml`), build `npm ci`, start `npm start`.
-- Database: Neon project. Run `schema.sql` once against it (`psql "<neon-url>" -f schema.sql`). Tables are not created automatically on deploy.
+- Render web service, root directory `foodbridge-backend`, build `npm install`, start `node app.js` (or use `render.yaml`).
+- Do not edit `.github/workflows` unless adding the frontend; Amna owns it.
