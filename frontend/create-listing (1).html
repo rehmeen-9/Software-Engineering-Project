@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post a listing - FoodBridge</title><link rel="stylesheet" href="shared.css">
+<style>label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}input,select,textarea{width:100%;box-sizing:border-box;padding:9px;border:1px solid #CDD3D0;border-radius:8px;font:inherit}
+.bad{border-color:#9B2C2C}.steps{display:flex;gap:6px;margin:10px 0}.steps span{flex:1;height:5px;border-radius:9px;background:#E4E7E5}.steps .on{background:#1B4A30}</style></head><body>
+<div class="nav"><b>FoodBridge Vendor</b><a href="vendor-dashboard.html">Dashboard</a><a href="vendor-listings.html">My listings</a></div>
+<div class="w"><h1>Post a listing</h1><p class="m" id="sub"></p><div class="steps"><span id="s1"></span><span id="s2"></span><span id="s3"></span></div>
+<div id="e" class="err"></div>
+<div id="p1"><label>Food name</label><input id="title" maxlength="150" placeholder="e.g. Sourdough loaves">
+<label>Food type</label><select id="food_type"><option value="">Choose one</option><option>Bakery</option><option>Meals</option><option>Produce</option><option>Packaged</option><option>Other</option></select>
+<label>Description (optional)</label><textarea id="description" rows="3" placeholder="What is it, how fresh, allergens"></textarea>
+<label>Photo link (optional)</label><input id="photo_url" placeholder="https://... link to a photo of the food"></div>
+<div id="p2" hidden><label>Available quantity</label><input id="quantity" type="number" min="1" step="1" placeholder="e.g. 6">
+<label>Pickup from</label><input id="pickup_start" type="datetime-local"><label>Pickup until</label><input id="pickup_end" type="datetime-local">
+<label>Pickup location</label><input id="pickup_address" placeholder="Shop, area, city"></div>
+<div id="p3" hidden><div class="box" id="review"></div><p class="m">Recipients see the food, quantity and pickup window. The exact address is shared only after you approve a claim.</p></div>
+<p><button class="btn" id="back" style="background:#EEF0EF" hidden>Back</button> <button class="btn" id="next">Next</button></p></div>
+<script src="config.js"></script>
+<script>
+var step=1,F=['title','food_type','description','photo_url','quantity','pickup_start','pickup_end','pickup_address'];
+function v(i){return document.getElementById(i).value.trim()}
+function show(){for(var i=1;i<=3;i++){document.getElementById('p'+i).hidden=i!==step;document.getElementById('s'+i).className=i<=step?'on':''}
+ document.getElementById('sub').textContent=['','Step 1 of 3: what is it?','Step 2 of 3: how much, when and where?','Step 3 of 3: check and post'][step];
+ document.getElementById('back').hidden=step===1;document.getElementById('next').textContent=step===3?'Post listing':'Next';
+ if(step===3)document.getElementById('review').innerHTML=[['Food',v('title')],['Type',v('food_type')],['Description',v('description')||'None'],['Quantity',v('quantity')],['Pickup',v('pickup_start').replace('T',' ')+' to '+v('pickup_end').replace('T',' ')],['Location',v('pickup_address')]].map(function(r){return '<div class="row"><span>'+r[0]+'</span><b>'+esc(r[1])+'</b></div>'}).join('')}
+function check(){var m=[],bad=[];
+ if(step===1){if(!v('title')){m.push('Food name is required');bad.push('title')}if(!v('food_type')){m.push('Choose a food type');bad.push('food_type')}if(v('photo_url')&&!/^https?:\/\/\S+$/i.test(v('photo_url'))){m.push('Photo must be a link starting with http:// or https://');bad.push('photo_url')}}
+ if(step===2){var q=Number(v('quantity'));if(!Number.isInteger(q)||q<1){m.push('Quantity must be a whole number of at least 1');bad.push('quantity')}
+  var s=new Date(v('pickup_start')),e=new Date(v('pickup_end'));
+  if(!v('pickup_start')){m.push('Pickup start is required');bad.push('pickup_start')}if(!v('pickup_end')){m.push('Pickup end is required');bad.push('pickup_end')}
+  if(v('pickup_start')&&v('pickup_end')){if(e<=s){m.push('Pickup end must be after pickup start');bad.push('pickup_end')}else if(e<=new Date()){m.push('Pickup window must end in the future');bad.push('pickup_end')}}
+  if(!v('pickup_address')){m.push('Pickup location is required');bad.push('pickup_address')}}
+ F.forEach(function(i){document.getElementById(i).className=bad.indexOf(i)>-1?'bad':''});
+ document.getElementById('e').innerHTML=m.map(esc).join('<br>');return !m.length}
+document.getElementById('back').onclick=function(){step--;document.getElementById('e').innerHTML='';show()};
+document.getElementById('next').onclick=async function(){
+ if(!check())return;
+ if(step<3){step++;show();return}
+ var b=this;b.disabled=true;
+ try{var r=await fetch(API_URL+'/api/listings',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeaders()),
+  body:JSON.stringify({title:v('title'),food_type:v('food_type'),description:v('description'),photo_url:v('photo_url'),quantity:Number(v('quantity')),pickup_start:new Date(v('pickup_start')).toISOString(),pickup_end:new Date(v('pickup_end')).toISOString(),pickup_address:v('pickup_address')})});
+  var d=await r.json();
+  if(!r.ok){document.getElementById('e').innerHTML=(d.errors||[d.message]).map(esc).join('<br>');b.disabled=false;return}
+  location.href='vendor-listings.html';
+ }catch(x){document.getElementById('e').textContent='Could not reach the server.';b.disabled=false}};
+show();
+</script></body></html>
