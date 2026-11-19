@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { authenticate, authorizeRoles } = require('../middleware/auth');
 const { updateListing, deleteListing } = require('../controllers/listings.controller');
 const { getMyListings, getListing } = require('../controllers/listingsView.controller');
+const { createListing, browseListings } = require('../controllers/listingsCreate.controller');
 router.get('/mine', authenticate, authorizeRoles('vendor'), getMyListings);
 router.get('/:id', authenticate, getListing);
 router.put('/:id', authenticate, authorizeRoles('vendor'), updateListing);
