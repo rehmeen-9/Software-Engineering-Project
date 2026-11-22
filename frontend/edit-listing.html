@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit listing - FoodBridge</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+  input,select,textarea{width:100%;box-sizing:border-box;padding:9px;border:1px solid #CDD3D0;border-radius:8px;font:inherit}
+  .bad{border-color:#9B2C2C}
+  .two{display:flex;gap:10px}
+  .two > div{flex:1}
+</style>
+</head>
+<body>
+<div class="nav"><b>FoodBridge Vendor</b><a href="vendor-dashboard.html">Dashboard</a><a href="vendor-listings.html">My listings</a></div>
+<div class="w">
+  <h1>Edit listing</h1>
+  <p class="m" id="sub">Loading...</p>
+  <div id="e" class="err"></div>
+
+  <div id="form" hidden>
+    <label for="title">Food name</label>
+    <input id="title" maxlength="150">
+
+    <label for="food_type">Food type</label>
+    <select id="food_type">
+      <option>Bakery</option><option>Meals</option><option>Produce</option><option>Packaged</option><option>Other</option>
+    </select>
+
+    <label for="description">Description (optional)</label>
+    <textarea id="description" rows="3"></textarea>
+
+    <label for="quantity">Available quantity</label>
+    <input id="quantity" type="number" min="1" step="1">
+
+    <label for="pickup_start">Pickup from</label>
+    <input id="pickup_start" type="datetime-local">
+
+    <label for="pickup_end">Pickup until</label>
+    <input id="pickup_end" type="datetime-local">
+
+    <label for="pickup_address">Pickup location</label>
+    <input id="pickup_address">
+
+    <label>Map location (lets nearby recipients find this listing)</label>
+    <div class="two">
+      <div><input id="latitude" placeholder="Latitude, e.g. 24.8607"></div>
+      <div><input id="longitude" placeholder="Longitude, e.g. 67.0011"></div>
+    </div>
+    <p>
+      <button class="link" id="geo" type="button">Use my current location</button>
+      <button class="link" id="clear" type="button">Clear</button>
+    </p>
+
+    <p><button class="btn" id="save">Save changes</button> <a class="link" href="vendor-listings.html">Cancel</a></p>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+var id = new URLSearchParams(location.search).get('id');
+var FIELDS = ['title','food_type','description','quantity','pickup_start','pickup_end','pickup_address','latitude','longitude'];
+
+function $(i){ return document.getElementById(i); }
+function v(i){ return $(i).value.trim(); }
+
+// ISO string from the server -> value for a datetime-local input (in the vendor's own time zone)
+function toLocal(iso){
+  if (!iso) return '';
+  var d = new Date(iso), p = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+function showErrors(list, bad){
+  $('e').innerHTML = list.map(esc).join('<br>');
+  FIELDS.forEach(function(f){ $(f).className = bad.indexOf(f) > -1 ? 'bad' : ''; });
+}
+
+// Same rules as the server, so the vendor gets instant feedback
+function validate(){
+  var m = [], bad = [];
+  if (!v('title')) { m.push('Food name is required'); bad.push('title'); }
+  var q = Number(v('quantity'));
+  if (!Number.isInteger(q) || q < 1) { m.push('Quantity must be a whole number of at least 1'); bad.push('quantity'); }
+  if (!v('pickup_start')) { m.push('Pickup start is required'); bad.push('pickup_start'); }
+  if (!v('pickup_end')) { m.push('Pickup end is required'); bad.push('pickup_end'); }
+  if (v('pickup_start') && v('pickup_end')) {
+    var s = new Date(v('pickup_start')), e = new Date(v('pickup_end'));
+    if (e <= s) { m.push('Pickup end must be after pickup start'); bad.push('pickup_end'); }
+    else if (e <= new Date()) { m.push('Pickup window must end in the future'); bad.push('pickup_end'); }
+  }
+  if (!v('pickup_address')) { m.push('Pickup location is required'); bad.push('pickup_address'); }
+  var la = v('latitude'), lo = v('longitude');
+  if (la || lo) {
+    var a = Number(la), b = Number(lo);
+    if (!la || !lo || !isFinite(a) || !isFinite(b) || a < -90 || a > 90 || b < -180 || b > 180) {
+      m.push('Enter both latitude (-90 to 90) and longitude (-180 to 180), or leave both empty');
+      bad.push('latitude'); bad.push('longitude');
+    }
+  }
+  showErrors(m, bad);
+  return !m.length;
+}
+
+async function load(){
+  if (!id) { $('sub').textContent = 'No listing selected.'; return; }
+  try {
+    var r = await fetch(API_URL + '/api/listings/' + encodeURIComponent(id) + '/edit', { headers: authHeaders() });
+    var d = await r.json();
+    if (!r.ok) { $('sub').textContent = d.message || 'Could not load this listing'; return; }
+    var l = d.listing;
+    $('title').value = l.title;
+    $('food_type').value = l.food_type;
+    $('description').value = l.description || '';
+    $('quantity').value = l.quantity;
+    $('pickup_start').value = toLocal(l.pickup_start);
+    $('pickup_end').value = toLocal(l.pickup_end);
+    $('pickup_address').value = l.pickup_address || '';
+    $('latitude').value = l.latitude === null ? '' : l.latitude;
+    $('longitude').value = l.longitude === null ? '' : l.longitude;
+    $('sub').textContent = 'Status: ' + l.status;
+    $('form').hidden = false;
+
+    if (l.status !== 'available' || new Date(l.pickup_end) <= new Date()) {
+      $('e').textContent = 'This listing can no longer be edited because it is ' + (l.status !== 'available' ? l.status : 'expired') + '.';
+      FIELDS.forEach(function(f){ $(f).disabled = true; });
+      $('save').disabled = true; $('geo').disabled = true; $('clear').disabled = true;
+    }
+  } catch (x) {
+    $('sub').textContent = 'Could not reach the server.';
+  }
+}
+
+$('geo').onclick = function(){
+  if (!navigator.geolocation) { $('e').textContent = 'Location is not available in this browser. Type the coordinates instead.'; return; }
+  navigator.geolocation.getCurrentPosition(function(p){
+    $('latitude').value = p.coords.latitude.toFixed(6);
+    $('longitude').value = p.coords.longitude.toFixed(6);
+    $('e').textContent = '';
+  }, function(){
+    $('e').textContent = 'Could not get your location. Allow location access or type the coordinates instead.';
+  });
+};
+$('clear').onclick = function(){ $('latitude').value = ''; $('longitude').value = ''; };
+
+$('save').onclick = async function(){
+  if (!validate()) return;
+  var btn = this; btn.disabled = true;
+  var body = {
+    title: v('title'),
+    food_type: v('food_type'),
+    description: v('description'),
+    quantity: Number(v('quantity')),
+    pickup_start: new Date(v('pickup_start')).toISOString(),
+    pickup_end: new Date(v('pickup_end')).toISOString(),
+    pickup_address: v('pickup_address'),
+    latitude: v('latitude') === '' ? null : Number(v('latitude')),
+    longitude: v('longitude') === '' ? null : Number(v('longitude'))
+  };
+  try {
+    var r = await fetch(API_URL + '/api/listings/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+      body: JSON.stringify(body)
+    });
+    var d = await r.json();
+    if (!r.ok) { showErrors(d.errors || [d.message], []); btn.disabled = false; return; }
+    location.href = 'vendor-listings.html';
+  } catch (x) {
+    $('e').textContent = 'Could not reach the server.';
+    btn.disabled = false;
+  }
+};
+
+load();
+</script>
+</body>
+</html>
