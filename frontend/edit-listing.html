@@ -19,31 +19,26 @@
   <h1>Edit listing</h1>
   <p class="m" id="sub">Loading...</p>
   <div id="e" class="err"></div>
-
   <div id="form" hidden>
     <label for="title">Food name</label>
     <input id="title" maxlength="150">
-
     <label for="food_type">Food type</label>
     <select id="food_type">
       <option>Bakery</option><option>Meals</option><option>Produce</option><option>Packaged</option><option>Other</option>
     </select>
-
     <label for="description">Description (optional)</label>
     <textarea id="description" rows="3"></textarea>
-
     <label for="quantity">Available quantity</label>
     <input id="quantity" type="number" min="1" step="1">
-
     <label for="pickup_start">Pickup from</label>
     <input id="pickup_start" type="datetime-local">
-
-    <label for="pickup_end">Pickup until</label>
+    <label for="pickup_until">Pickup until</label>
     <input id="pickup_end" type="datetime-local">
-
     <label for="pickup_address">Pickup location</label>
     <input id="pickup_address">
-
+    <label for="image">Photo (JPG, PNG or WebP, max 3 MB)</label>
+    <img id="curImg" alt="" style="max-width:160px;border-radius:8px;display:block;margin-bottom:6px">
+    <input id="image" type="file" accept="image/jpeg,image/png,image/webp">
     <label>Map location (lets nearby recipients find this listing)</label>
     <div class="two">
       <div><input id="latitude" placeholder="Latitude, e.g. 24.8607"></div>
@@ -53,31 +48,25 @@
       <button class="link" id="geo" type="button">Use my current location</button>
       <button class="link" id="clear" type="button">Clear</button>
     </p>
-
     <p><button class="btn" id="save">Save changes</button> <a class="link" href="vendor-listings.html">Cancel</a></p>
   </div>
 </div>
-
 <script src="config.js"></script>
 <script>
 var id = new URLSearchParams(location.search).get('id');
 var FIELDS = ['title','food_type','description','quantity','pickup_start','pickup_end','pickup_address','latitude','longitude'];
-
 function $(i){ return document.getElementById(i); }
 function v(i){ return $(i).value.trim(); }
-
 // ISO string from the server -> value for a datetime-local input (in the vendor's own time zone)
 function toLocal(iso){
   if (!iso) return '';
   var d = new Date(iso), p = function(n){ return String(n).padStart(2,'0'); };
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
 }
-
 function showErrors(list, bad){
   $('e').innerHTML = list.map(esc).join('<br>');
   FIELDS.forEach(function(f){ $(f).className = bad.indexOf(f) > -1 ? 'bad' : ''; });
 }
-
 // Same rules as the server, so the vendor gets instant feedback
 function validate(){
   var m = [], bad = [];
@@ -103,7 +92,6 @@ function validate(){
   showErrors(m, bad);
   return !m.length;
 }
-
 async function load(){
   if (!id) { $('sub').textContent = 'No listing selected.'; return; }
   try {
@@ -121,18 +109,19 @@ async function load(){
     $('latitude').value = l.latitude === null ? '' : l.latitude;
     $('longitude').value = l.longitude === null ? '' : l.longitude;
     $('sub').textContent = 'Status: ' + l.status;
+    $('curImg').onerror = function(){ this.style.display = 'none'; };
+    $('curImg').src = API_URL + '/api/listings/' + encodeURIComponent(id) + '/image?t=' + Date.now();
     $('form').hidden = false;
-
     if (l.status !== 'available' || new Date(l.pickup_end) <= new Date()) {
       $('e').textContent = 'This listing can no longer be edited because it is ' + (l.status !== 'available' ? l.status : 'expired') + '.';
       FIELDS.forEach(function(f){ $(f).disabled = true; });
+      $('image').disabled = true;
       $('save').disabled = true; $('geo').disabled = true; $('clear').disabled = true;
     }
   } catch (x) {
     $('sub').textContent = 'Could not reach the server.';
   }
 }
-
 $('geo').onclick = function(){
   if (!navigator.geolocation) { $('e').textContent = 'Location is not available in this browser. Type the coordinates instead.'; return; }
   navigator.geolocation.getCurrentPosition(function(p){
@@ -144,9 +133,10 @@ $('geo').onclick = function(){
   });
 };
 $('clear').onclick = function(){ $('latitude').value = ''; $('longitude').value = ''; };
-
 $('save').onclick = async function(){
   if (!validate()) return;
+  var imgErr = checkImageFile($('image').files[0]);
+  if (imgErr) { $('e').textContent = imgErr; return; }
   var btn = this; btn.disabled = true;
   var body = {
     title: v('title'),
@@ -167,13 +157,17 @@ $('save').onclick = async function(){
     });
     var d = await r.json();
     if (!r.ok) { showErrors(d.errors || [d.message], []); btn.disabled = false; return; }
+    var file = $('image').files[0];
+    if (file) {
+      var u = await uploadListingImage(id, file);
+      if (!u.ok) { $('e').textContent = 'Your changes were saved, but the photo was not uploaded: ' + u.message; btn.disabled = false; return; }
+    }
     location.href = 'vendor-listings.html';
   } catch (x) {
     $('e').textContent = 'Could not reach the server.';
     btn.disabled = false;
   }
 };
-
 load();
 </script>
 </body>

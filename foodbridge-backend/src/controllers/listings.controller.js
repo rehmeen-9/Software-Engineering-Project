@@ -2,6 +2,33 @@ const pool = require('../config/db');
 
 const FOOD_TYPES = ['Bakery', 'Meals', 'Produce', 'Packaged', 'Other'];
 
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Returns { lat, lng } or { empty: true } (both blank) or { error }
+function parseCoords(latRaw, lngRaw) {
+  const blank = (v) => v === undefined || v === null || v === '';
+  if (blank(latRaw) && blank(lngRaw)) return { empty: true };
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  if (
+    blank(latRaw) || blank(lngRaw) ||
+    !Number.isFinite(lat) || !Number.isFinite(lng) ||
+    lat < -90 || lat > 90 || lng < -180 || lng > 180
+  ) {
+    return { error: 'Latitude (-90 to 90) and longitude (-180 to 180) must both be valid numbers' };
+  }
+  return { lat, lng };
+}
+
 function parseId(value) {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? id : null;
