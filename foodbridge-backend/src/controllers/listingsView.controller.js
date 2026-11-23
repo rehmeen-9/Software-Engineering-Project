@@ -31,7 +31,16 @@ exports.getListing = async (req, res) => {
       return res.status(404).json({ message: 'Listing not found' });
     }
 
-    res.json({ listing: result.rows[0] });
+    const listing = result.rows[0];
+
+    // Privacy: only the vendor who owns the listing gets the exact map coordinates.
+    // Recipients only ever see a distance (from the nearby endpoint).
+    if (listing.vendor_id !== req.user.id) {
+      delete listing.latitude;
+      delete listing.longitude;
+    }
+
+    res.json({ listing });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
