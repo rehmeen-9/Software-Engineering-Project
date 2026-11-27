@@ -189,3 +189,22 @@ exports.deleteListing = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+exports.removeListing = async (req, res) => {
+  const { id } = req.params;
+  const { rows } = await pool.query(
+    'SELECT vendor_id, status FROM listings WHERE id = $1', [id]
+  );
+  const listing = rows[0];
+
+  if (!listing || listing.status === 'removed')
+    return res.status(404).json({ error: 'Listing not found' });
+  if (listing.vendor_id !== req.user.id)
+    return res.status(403).json({ error: 'You can only remove your own listings' });
+  if (listing.status === 'reserved')
+    return res.status(409).json({ error: 'Listing has an active reservation' });
+
+  await pool.query(
+    "UPDATE listings SET status = 'removed', removed_at = NOW() WHERE id = $1", [id]
+  );
+  res.json({ message: 'Listing removed successfully' });
+};
