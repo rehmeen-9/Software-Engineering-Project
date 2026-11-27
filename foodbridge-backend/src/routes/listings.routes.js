@@ -21,5 +21,6 @@ router.get('/:id/edit', authenticate, authorizeRoles('vendor'), getListingForEdi
 router.get('/:id', authenticate, getListing);
 router.put('/:id', authenticate, authorizeRoles('vendor'), updateListing);
 router.delete('/:id', authenticate, authorizeRoles('vendor'), deleteListing);
+router.delete('/:id', authenticate, authorizeRole('vendor'), listingController.removeListing);
 
 module.exports = router;
