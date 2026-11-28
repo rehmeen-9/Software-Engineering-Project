@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in - FoodBridge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff;color:#202A25;font:15px/1.5 'DM Sans',system-ui,sans-serif}
+    .nav{background:#202A25;color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+    .brand{font:400 21px 'DM Serif Display',Georgia,serif;color:#fff;text-decoration:none}
+    .nav a:last-child{color:#10281B;background:#A9D6B8;border-radius:99px;padding:7px 15px;text-decoration:none;font-size:13px}
+    .layout{max-width:1000px;margin:55px auto;padding:0 18px;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:35px}
+    .intro{background:#202A25;color:#fff;padding:38px;border-radius:14px;min-height:300px;display:flex;flex-direction:column;justify-content:center}
+    h1,h2{font:400 34px/1.1 'DM Serif Display',Georgia,serif;margin:0 0 12px}
+    .intro h1{color:#A9D6B8;font-size:42px}
+    .intro p{max-width:360px;color:#e7eee9}
+    .form{max-width:410px;width:100%;margin:auto}
+    .muted{color:#66706A;font-size:13px;margin:0 0 18px}
+    label{display:block;font-weight:700;font-size:13px;margin:12px 0 4px}
+    input,select{width:100%;border:1px solid #CDD3D0;border-radius:10px;padding:11px 12px;font:inherit;background:#fff;color:#202A25}
+    button{width:100%;border:0;border-radius:99px;padding:11px 16px;margin-top:18px;background:#A9D6B8;color:#10281B;font:500 15px 'DM Sans';cursor:pointer}
+    button:disabled{opacity:.6;cursor:wait}
+    .message{min-height:22px;margin:12px 0 0;font-size:13px;color:#a12626}
+    .switch{text-align:center;font-size:13px;margin-top:18px}
+    a{color:inherit}
+    @media(max-width:680px){.layout{grid-template-columns:1fr;margin:22px auto;gap:20px}.intro{min-height:170px;padding:25px}.intro h1{font-size:34px}.form{padding:8px}}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="browse.html">FoodBridge</a>
+    <a href="signup.html">Create an account</a>
+  </nav>
+
+  <main class="layout">
+    <section class="intro">
+      <h1>Wholesome goodness, shared.</h1>
+      <p>Log in to find food near you, request a pickup, or manage the surplus food you share.</p>
+    </section>
+
+    <section class="form">
+      <h2>Welcome back</h2>
+      <p class="muted">Log in to your FoodBridge account.</p>
+      <form id="loginForm">
+        <label for="role">I am logging in as</label>
+        <select id="role" required>
+          <option value="recipient">Recipient</option>
+          <option value="vendor">Vendor</option>
+        </select>
+
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Your password" required>
+
+        <button id="submitButton" type="submit">Log in</button>
+        <p id="message" class="message" role="alert"></p>
+      </form>
+      <p class="switch">New to FoodBridge? <a href="signup.html">Create an account</a></p>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script>
+    const form = document.getElementById('loginForm');
+    const message = document.getElementById('message');
+    const submitButton = document.getElementById('submitButton');
+
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      message.textContent = '';
+      submitButton.disabled = true;
+      submitButton.textContent = 'Logging in...';
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const selectedRole = document.getElementById('role').value;
+
+      try {
+        const response = await fetch(API_URL + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Login failed. Please check your details.');
+        }
+
+        if (!data.token || !data.user) {
+          throw new Error('The server response did not contain a login token.');
+        }
+
+        if (data.user.role !== selectedRole) {
+          throw new Error('This account is registered as a ' + data.user.role + '. Please select the correct account type.');
+        }
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('role', data.user.role);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        window.location.href = data.user.role === 'vendor'
+          ? 'vendor-listings.html'
+          : 'browse.html';
+      } catch (error) {
+        message.textContent = error.message || 'Could not reach the server.';
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Log in';
+      }
+    });
+  </script>
+</body>
+</html>

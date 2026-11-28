@@ -1,71 +1,48 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Browse food - FoodBridge</title><link rel="stylesheet" href="shared.css">
-<style>.bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}select{padding:6px 10px;border:1px solid #CDD3D0;border-radius:8px;font:inherit}
-.card{display:flex;gap:12px;border:1px solid #E4E7E5;border-radius:12px;padding:10px;margin:12px 0;color:inherit;text-decoration:none}
-.ph{width:96px;height:96px;border-radius:8px;background:#EEF0EF;color:#66706A;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;object-fit:cover}
-.empty{text-align:center;padding:40px 10px;border:1px dashed #CDD3D0;border-radius:12px}
-.note{margin:10px 0}</style></head><body>
-<div class="nav"><b>FoodBridge</b><a href="browse.html" style="text-decoration:underline">Browse</a><a href="my-claims.html">My claims</a></div>
-<div class="w"><h1>Browse food</h1><p class="m">Available food near you, ready to collect.</p>
-<div class="bar"><div id="tabs"></div>
-<div><select id="radius"><option value="">Any distance</option><option value="2">Within 2 km</option><option value="5">Within 5 km</option><option value="10">Within 10 km</option></select>
-<select id="sort"><option value="nearest">Nearest first</option><option value="soonest">Expiring soonest</option><option value="newest">Newest first</option></select></div></div>
-<p class="m note"><span id="note"></span> <button class="link" id="save" type="button" hidden>Save this as my location</button> <button class="link" id="retry" type="button">📍 Refresh location</button></p>
-<div id="list">Loading...</div></div>
-<script src="config.js"></script>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Browse food - FoodBridge</title><link rel="stylesheet" href="shared.css"></head><body>
+<div id="nav"></div>
+<main class="wrap">
+  <div class="top"><div><h1>Food available now</h1><p class="muted" style="margin:0">Surplus food shared by local vendors. Tap a listing for details.</p></div>
+  <button class="btn2" id="near">Show nearest first</button></div>
+  <input class="in" id="q" type="search" placeholder="Search by name or vendor" aria-label="Search listings">
+  <div id="chips"></div>
+  <div class="msg" id="msg"></div>
+  <div class="grid" id="grid"></div>
+</main>
+<script src="config.js"></script><script src="foodbridge.js"></script>
 <script>
-var TYPES=['All','Bakery','Meals','Produce','Packaged','Other'],cur='',coords=null;
-function tabs(){document.getElementById('tabs').innerHTML=TYPES.map(function(t,i){var f=i?t:'';return '<span class="chip'+(f===cur?' on':'')+'" data-f="'+f+'">'+t+'</span>'}).join('')}
-document.getElementById('tabs').onclick=function(e){if(e.target.dataset.f!==undefined){cur=e.target.dataset.f;tabs();load()}};
-document.getElementById('sort').onchange=load;
-document.getElementById('radius').onchange=load;
-document.getElementById('retry').onclick=locate;
-function img(l){var s=photoSrc(l.photo_url);return s?'<img class="ph" alt="" src="'+esc(s)+'" onerror="this.outerHTML=\'<div class=ph>No photo</div>\'">':'<div class="ph">No photo</div>'}
-
-// Ask the browser for the current location. If that fails, the server uses the saved profile location.
-function locate(){
-  document.getElementById('note').textContent='Finding your location...';
-  if(!navigator.geolocation){coords=null;load();return}
-  navigator.geolocation.getCurrentPosition(
-    function(p){coords={lat:p.coords.latitude,lng:p.coords.longitude};load()},
-    function(){coords=null;load()},
-    {timeout:8000,maximumAge:60000});
+if (FB.guard('recipient')) {
+  FB.nav('browse.html');
+  let all = [], cat = 'All', nearMode = false;
+  const q = document.getElementById('q'), msg = document.getElementById('msg'), btn = document.getElementById('near');
+  function draw() {
+    const t = q.value.toLowerCase();
+    const rows = all.filter(l => (cat === 'All' || l.category === cat) && (l.title + ' ' + l.vendor).toLowerCase().includes(t));
+    document.getElementById('grid').innerHTML = rows.length ? rows.map(l =>
+      '<a class="card" href="listing-details.html?id=' + encodeURIComponent(l.id) + '">' + FB.photo(l, 96) +
+      '<div class="strip"><span>' + FB.esc(l.quantity) + ' available</span><span>' + (l.distance !== undefined ? FB.esc(l.distance) + ' km away' : 'Until ' + FB.esc(FB.when(l.pickupEnd))) + '</span></div>' +
+      '<div class="p"><b>' + FB.esc(l.title) + '</b><span class="muted">' + FB.esc(l.vendor) + '</span>' +
+      (l.category ? '<br><span class="tag">' + FB.esc(l.category) + '</span>' : '') + '</div></a>').join('')
+      : '<p class="empty">No listings match right now.</p>';
+  }
+  function chips() {
+    const cats = ['All', 'Meals', 'Bakery', 'Produce', 'Packaged', 'Other'];
+    document.getElementById('chips').innerHTML = cats.map(c => '<button class="chip' + (c === cat ? ' on' : '') + '" data-c="' + c + '">' + c + '</button>').join('');
+  }
+  async function load(url) {
+    msg.className = 'msg';
+    try { all = FB.list(await FB.api(url)); draw(); } catch (e) { FB.show(msg, e.message, 'err'); }
+  }
+  btn.addEventListener('click', () => {
+    if (nearMode) { nearMode = false; btn.textContent = 'Show nearest first'; return load('/api/listings'); }
+    if (!navigator.geolocation) return FB.show(msg, 'Your browser does not support location.', 'err');
+    btn.disabled = true;
+    navigator.geolocation.getCurrentPosition(p => {
+      nearMode = true; btn.disabled = false; btn.textContent = 'Show all listings';
+      load('/api/listings/nearby?sort=nearest&lat=' + p.coords.latitude + '&lng=' + p.coords.longitude);
+    }, () => { btn.disabled = false; FB.show(msg, 'Location was blocked. Allow it in your browser to sort by distance.', 'err'); });
+  });
+  document.getElementById('chips').addEventListener('click', e => { if (e.target.dataset.c) { cat = e.target.dataset.c; chips(); draw(); } });
+  q.addEventListener('input', draw);
+  chips(); load('/api/listings');
 }
-
-async function load(){
-  var box=document.getElementById('list'),note=document.getElementById('note'),save=document.getElementById('save');
-  var sv=document.getElementById('sort').value,rad=document.getElementById('radius').value,q=[];
-  if(cur)q.push('food_type='+encodeURIComponent(cur));
-  save.hidden=true;
-  try{
-    var n=q.concat('sort='+sv);
-    if(coords)n.push('lat='+coords.lat,'lng='+coords.lng);
-    if(rad)n.push('radius='+rad);
-    var r=await fetch(API_URL+'/api/listings/nearby?'+n.join('&'),{headers:authHeaders()}),d=await r.json(),located=true;
-    if(r.status===422){
-      // no current location and no saved location: ordinary browsing, without distances
-      located=false;
-      r=await fetch(API_URL+'/api/listings?'+q.concat('sort='+(sv==='soonest'?'soonest':'newest')).join('&'),{headers:authHeaders()});
-      d=await r.json();
-    }
-    if(!r.ok){box.innerHTML='<p class="err">'+esc(d.message)+'</p>';return}
-    if(!located)note.textContent='We could not get your location and you have no saved location, so distances are not shown.';
-    else if(d.location_source==='saved')note.textContent='Location is off, so distances use your saved location.';
-    else{note.textContent='Distances are from your current location.';save.hidden=false}
-    box.innerHTML=d.listings.length?d.listings.map(function(l){
-      return '<a class="card" href="listing-details.html?id='+l.id+'">'+img(l)+'<div><b>'+esc(l.title)+'</b><br><span class="m">'+esc(l.vendor_name)+'</span><br><span class="tag">'+l.quantity+' left</span> <span class="tag n">'+esc(l.food_type)+'</span>'+(l.distance_km!==undefined?' <span class="tag">'+l.distance_km+' km away</span>':'')+'<br><span class="m">Pickup: '+esc(fmtWindow(l.pickup_start,l.pickup_end))+'</span></div></a>'}).join('')
-      :'<div class="empty"><b>'+(located&&rad?'No food within '+esc(rad)+' km':(cur?'No '+esc(cur.toLowerCase())+' listings right now':'No food is available right now'))+'</b><p class="m">'+(located&&rad?'Try a bigger distance.':'New listings appear here as vendors post them. Check back soon.')+'</p></div>';
-  }catch(e){box.innerHTML='<p class="err">Could not reach the server.</p>'}
-}
-
-document.getElementById('save').onclick=async function(){
-  if(!coords)return;
-  var note=document.getElementById('note');
-  try{
-    var r=await fetch(API_URL+'/api/listings/my-location',{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},authHeaders()),body:JSON.stringify({latitude:coords.lat,longitude:coords.lng})});
-    var d=await r.json();
-    note.textContent=r.ok?'Saved. We will use this when your location is off.':d.message;
-  }catch(e){note.textContent='Could not reach the server.'}
-};
-tabs();locate();
 </script></body></html>

@@ -1,56 +1,58 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Post a listing - FoodBridge</title><link rel="stylesheet" href="shared.css">
-<style>label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}input,select,textarea{width:100%;box-sizing:border-box;padding:9px;border:1px solid #CDD3D0;border-radius:8px;font:inherit}
-.bad{border-color:#9B2C2C}.steps{display:flex;gap:6px;margin:10px 0}.steps span{flex:1;height:5px;border-radius:9px;background:#E4E7E5}.steps .on{background:#1B4A30}</style></head><body>
-<div class="nav"><b>FoodBridge Vendor</b><a href="vendor-dashboard.html">Dashboard</a><a href="vendor-listings.html">My listings</a></div>
-<div class="w"><h1>Post a listing</h1><p class="m" id="sub"></p><div class="steps"><span id="s1"></span><span id="s2"></span><span id="s3"></span></div>
-<div id="e" class="err"></div>
-<div id="p1"><label>Food name</label><input id="title" maxlength="150" placeholder="e.g. Sourdough loaves">
-<label>Food type</label><select id="food_type"><option value="">Choose one</option><option>Bakery</option><option>Meals</option><option>Produce</option><option>Packaged</option><option>Other</option></select>
-<label>Description (optional)</label><textarea id="description" rows="3" placeholder="What is it, how fresh, allergens"></textarea>
-<label>Photo (optional: JPG, PNG or WebP, max 3 MB)</label><input id="image" type="file" accept="image/jpeg,image/png,image/webp"></div>
-<div id="p2" hidden><label>Available quantity</label><input id="quantity" type="number" min="1" step="1" placeholder="e.g. 6">
-<label>Pickup from</label><input id="pickup_start" type="datetime-local"><label>Pickup until</label><input id="pickup_end" type="datetime-local">
-<label>Pickup location</label><input id="pickup_address" placeholder="Shop, area, city">
-<p><button class="btn" id="geo" type="button" style="background:#EEF0EF">📍 Use my current location</button> <span class="m" id="geoNote">Optional: lets nearby recipients see how far the food is.</span></p></div>
-<div id="p3" hidden><div class="box" id="review"></div><p class="m">Recipients see the food, quantity and pickup window. The exact address is shared only after you approve a claim.</p></div>
-<p><button class="btn" id="back" style="background:#EEF0EF" hidden>Back</button> <button class="btn" id="next">Next</button></p></div>
-<script src="config.js"></script>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Post food - FoodBridge</title><link rel="stylesheet" href="shared.css"></head><body>
+<div id="nav"></div>
+<main class="wrap narrow">
+  <h1 id="h">Post surplus food</h1>
+  <p class="muted">Tell recipients what is available and when they can collect it.</p>
+  <div class="msg" id="msg"></div>
+  <form class="box" id="f">
+    <label for="title">Food name</label><input class="in" id="title" required maxlength="150" placeholder="e.g. Sourdough loaves">
+    <label for="food_type">Food type</label>
+    <select class="in" id="food_type"><option>Meals</option><option>Bakery</option><option>Produce</option><option>Packaged</option><option>Other</option></select>
+    <label for="quantity">Quantity</label><input class="in" id="quantity" type="number" min="1" step="1" required value="1">
+    <label for="pickup_start">Pickup starts</label><input class="in" id="pickup_start" type="datetime-local" required>
+    <label for="pickup_end">Pickup ends</label><input class="in" id="pickup_end" type="datetime-local" required>
+    <label for="pickup_address">Pickup address</label><input class="in" id="pickup_address" required placeholder="Shop, area, city">
+    <button class="btn2" type="button" id="loc" style="margin:-6px 0 14px">Use my current location for distance search</button>
+    <span class="muted" id="locnote"></span>
+    <label for="photo_url">Photo link (optional)</label><input class="in" id="photo_url" type="url" placeholder="https://...">
+    <label for="description">Details</label><textarea class="in" id="description" placeholder="Storage, allergens, how many people it feeds"></textarea>
+    <button class="btn" id="go" type="submit">Post listing</button>
+    <a class="btn2" href="vendor-listings.html">Cancel</a>
+  </form>
+</main>
+<script src="config.js"></script><script src="foodbridge.js"></script>
 <script>
-var step=1,coords=null,F=['title','food_type','description','image','quantity','pickup_start','pickup_end','pickup_address'];
-function v(i){return document.getElementById(i).value.trim()}
-function show(){for(var i=1;i<=3;i++){document.getElementById('p'+i).hidden=i!==step;document.getElementById('s'+i).className=i<=step?'on':''}
- document.getElementById('sub').textContent=['','Step 1 of 3: what is it?','Step 2 of 3: how much, when and where?','Step 3 of 3: check and post'][step];
- document.getElementById('back').hidden=step===1;document.getElementById('next').textContent=step===3?'Post listing':'Next';
- if(step===3)document.getElementById('review').innerHTML=[['Food',v('title')],['Type',v('food_type')],['Description',v('description')||'None'],['Quantity',v('quantity')],['Pickup',v('pickup_start').replace('T',' ')+' to '+v('pickup_end').replace('T',' ')],['Location',v('pickup_address')],['Map location',coords?'Saved':'Not set']].map(function(r){return '<div class="row"><span>'+r[0]+'</span><b>'+esc(r[1])+'</b></div>'}).join('')}
-function check(){var m=[],bad=[];
- if(step===1){if(!v('title')){m.push('Food name is required');bad.push('title')}if(!v('food_type')){m.push('Choose a food type');bad.push('food_type')}var imgErr=checkImageFile(document.getElementById('image').files[0]);if(imgErr){m.push(imgErr);bad.push('image')}}
- if(step===2){var q=Number(v('quantity'));if(!Number.isInteger(q)||q<1){m.push('Quantity must be a whole number of at least 1');bad.push('quantity')}
-  var s=new Date(v('pickup_start')),e=new Date(v('pickup_end'));
-  if(!v('pickup_start')){m.push('Pickup start is required');bad.push('pickup_start')}if(!v('pickup_end')){m.push('Pickup end is required');bad.push('pickup_end')}
-  if(v('pickup_start')&&v('pickup_end')){if(e<=s){m.push('Pickup end must be after pickup start');bad.push('pickup_end')}else if(e<=new Date()){m.push('Pickup window must end in the future');bad.push('pickup_end')}}
-  if(!v('pickup_address')){m.push('Pickup location is required');bad.push('pickup_address')}}
- F.forEach(function(i){document.getElementById(i).className=bad.indexOf(i)>-1?'bad':''});
- document.getElementById('e').innerHTML=m.map(esc).join('<br>');return !m.length}
-document.getElementById('back').onclick=function(){step--;document.getElementById('e').innerHTML='';show()};
-document.getElementById('next').onclick=async function(){
- if(!check())return;
- if(step<3){step++;show();return}
- var b=this;b.disabled=true;
- try{var r=await fetch(API_URL+'/api/listings',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeaders()),
-  body:JSON.stringify({title:v('title'),food_type:v('food_type'),description:v('description'),quantity:Number(v('quantity')),pickup_start:new Date(v('pickup_start')).toISOString(),pickup_end:new Date(v('pickup_end')).toISOString(),pickup_address:v('pickup_address'),latitude:coords?coords.lat:null,longitude:coords?coords.lng:null})});
-  var d=await r.json();
-  if(!r.ok){document.getElementById('e').innerHTML=(d.errors||[d.message]).map(esc).join('<br>');b.disabled=false;return}
-  var file=document.getElementById('image').files[0];
-  if(file){var u=await uploadListingImage(d.listing.id,file);
-   if(!u.ok){document.getElementById('e').innerHTML=esc('Your listing was posted, but the photo was not uploaded: '+u.message)+' <a href="edit-listing.html?id='+d.listing.id+'">Add the photo again</a>';return}}
-  location.href='vendor-listings.html';
- }catch(x){document.getElementById('e').textContent='Could not reach the server.';b.disabled=false}};
-document.getElementById('geo').onclick=function(){
-  var n=document.getElementById('geoNote');
-  if(!navigator.geolocation){n.textContent='Location is not available in this browser.';return}
-  n.textContent='Finding your location...';
-  navigator.geolocation.getCurrentPosition(function(p){coords={lat:p.coords.latitude,lng:p.coords.longitude};n.textContent='Location saved ✓'},function(){coords=null;n.textContent='Could not get your location. You can still post without it.'},{timeout:8000});
-};
-show();
+if (FB.guard('vendor')) {
+  FB.nav('create-listing.html');
+  const id = new URLSearchParams(location.search).get('id');
+  const msg = document.getElementById('msg'), F = n => document.getElementById(n);
+  const text = ['title', 'food_type', 'quantity', 'pickup_address', 'photo_url', 'description'];
+  let coords = null;
+  F('loc').onclick = () => navigator.geolocation
+    ? navigator.geolocation.getCurrentPosition(p => { coords = { latitude: p.coords.latitude, longitude: p.coords.longitude }; F('locnote').textContent = 'Location captured.'; },
+        () => F('locnote').textContent = 'Location was blocked by the browser.')
+    : F('locnote').textContent = 'Location is not supported here.';
+  if (id) {
+    F('h').textContent = 'Edit listing'; F('go').textContent = 'Save changes';
+    FB.api('/api/listings/' + encodeURIComponent(id) + '/edit').then(d => {
+      const l = FB.one(d);
+      F('title').value = l.title; F('food_type').value = l.category || 'Other'; F('quantity').value = l.quantity;
+      F('pickup_address').value = l.address; F('photo_url').value = l.photo; F('description').value = l.description;
+      F('pickup_start').value = FB.toInput(l.pickupStart); F('pickup_end').value = FB.toInput(l.pickupEnd);
+    }).catch(e => FB.show(msg, e.message, 'err'));
+  }
+  F('f').addEventListener('submit', async e => {
+    e.preventDefault();
+    const body = {}; text.forEach(n => body[n] = F(n).value);
+    body.quantity = Number(body.quantity);
+    body.pickup_start = new Date(F('pickup_start').value).toISOString();
+    body.pickup_end = new Date(F('pickup_end').value).toISOString();
+    if (coords) Object.assign(body, coords);
+    F('go').disabled = true;
+    try {
+      await FB.api(id ? '/api/listings/' + encodeURIComponent(id) : '/api/listings', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+      location.href = 'vendor-listings.html';
+    } catch (err) { FB.show(msg, err.message, 'err'); F('go').disabled = false; }
+  });
+}
 </script></body></html>
